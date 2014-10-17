@@ -26,8 +26,10 @@ public class QryopIlNear extends QryopIl {
      *  of arguments. Thus new QryopIlSyn (arg1, arg2, arg3, ...).
      */
     public QryopIlNear(int dis, Qryop... q) {
-      for (int i = 0; i < q.length; i++)
-        this.args.add(q[i]);
+        this.dis = dis;
+        
+        for (int i = 0; i < q.length; i++)
+            this.args.add(q[i]);
     }
     
     public QryopIlNear(int dis) {
@@ -127,9 +129,9 @@ public class QryopIlNear extends QryopIl {
                 }
                 
                 // reach here if all positions match, add to temporary result
-                // TODO: here I stored the position of the first term, should be 
-                // the last one.
-                resultPositions.add(ptr0.invList.getPos(ptr0.nextDoc, idx[0]));
+                // Note: store the position of the last term
+                DaaTPtr ptrlast = this.daatPtrs.get(this.daatPtrs.size()-1);
+                resultPositions.add(ptrlast.invList.getPos(ptrlast.nextDoc, idx[this.daatPtrs.size()-1]));
                 for (int i = 1; i < idx.length; i++)
                     idx[i]++;                
             }
