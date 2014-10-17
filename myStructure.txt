@@ -1,0 +1,14 @@
+10:#AND(cheap.title internet.keywords) 0.3282
+12:#AND(djs.url djs.title) 0.2603
+26:#AND(lower #NEAR/2(heart rate)) 0.2699
+29:#AND(#NEAR/2(ps 2) game) 0.0448
+33:#AND(#NEAR/2(elliptical trainer)) 0.3676
+52:#OR(avp.url avp.title) 0.1606
+71:#AND(living in india.keywords) 0.1009
+102:#AND(#NEAR/2(fickle creek farm)) 0.0065
+149:#AND(uplift #NEAR/3(yellowstone national park) #NEAR/3(yellowstone park)) 0.1731
+190:#AND(#NEAR/2(brooks.title brothers.title) clearance) 0.1100
+
+avg 
+
+'url', 'keywords' (from the html 'meta' tag), 'title', 'body', and 'inlink'. 
