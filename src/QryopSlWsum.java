@@ -55,7 +55,7 @@ public class QryopSlWsum extends QryopSl {
     private QryResult evaluateIndri(RetrievalModelIndri r) throws IOException {
         // parameter verification
         if (this.args.size() != weights.size())
-            QryEval.fatalError("WAND: parameters are invalid!");
+            QryEval.fatalError("WSUM: parameters are invalid!");
         
         // initialization
         allocDaaTPtrs (r);

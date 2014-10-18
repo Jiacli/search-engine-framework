@@ -542,15 +542,16 @@ public class QryEval {
         StringTokenizer tokens = new StringTokenizer(qString, "\t\n\r ,()",
                 true);
         String token = null;
-
-        // Each pass of the loop processes one token. To improve
-        // efficiency and clarity, the query operator on the top of the
-        // stack is also stored in currentOp.
+        
+        // used for operators with the weight arguments
         boolean hasWeight = false;
         boolean gotWeight = false;
         double weight = 0.0;
         Stack<Double> wStack = new Stack<Double>();
 
+        // Each pass of the loop processes one token. To improve
+        // efficiency and clarity, the query operator on the top of the
+        // stack is also stored in currentOp.
         while (tokens.hasMoreTokens()) {
 
             token = tokens.nextToken();
@@ -615,6 +616,10 @@ public class QryEval {
                 // below). Otherwise, add the current operator as an
                 // argument to the higher-level operator, and shift
                 // processing back to the higher-level operator.
+                if (currentOp instanceof QryopSlWsum
+                        || currentOp instanceof QryopSlWand) {
+                    hasWeight = false;
+                }
                 stack.pop();
 
                 if (stack.empty())
@@ -623,6 +628,7 @@ public class QryEval {
                 Qryop arg = currentOp;
                 currentOp = stack.peek();
                 
+                // check whether the upper operator has weights
                 if (currentOp instanceof QryopSlWsum
                         || currentOp instanceof QryopSlWand) {
                     hasWeight = true;
@@ -665,6 +671,12 @@ public class QryEval {
                                 gotWeight = false;
                             }
                         }
+                        else {
+                            // drop the weight for stop words in hasWeight mode
+                            if (hasWeight)
+                                gotWeight = false;
+                        }
+                        
                         break;
                     }
                 }
@@ -672,10 +684,15 @@ public class QryEval {
                     String[] terms = tokenizeQuery(token);
                     if (terms.length != 0) {
                         currentOp.add(new QryopIlTerm(terms[0]));
-                        if (hasWeight) {
+                        if (hasWeight && gotWeight) {
                             currentOp.addWeight(weight);
                             gotWeight = false;
                         }
+                    }
+                    else {
+                        // drop the weight for stop words in hasWeight mode
+                        if (hasWeight)
+                            gotWeight = false;
                     }
                 }
             }
