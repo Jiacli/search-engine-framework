@@ -270,4 +270,12 @@ public class QryopSlScore extends QryopSl {
 
         return ("#SCORE( " + result + ")");
     }
+
+    /**
+     * Not use in this operator!
+     */
+    @Override
+    public void addWeight(Double w) {
+        // Do nothing        
+    }
 }

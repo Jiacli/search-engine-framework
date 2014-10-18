@@ -181,4 +181,12 @@ public class QryopIlNear extends QryopIl {
         return ("#NEAR/" + dis + "(" + result + ")");
     }
 
+    /**
+     * Not use in this operator!
+     */
+    @Override
+    public void addWeight(Double w) {
+        // Do nothing        
+    }
+
 }

@@ -139,4 +139,12 @@ public class QryopSlSum extends QryopSl {
     public double getDefaultScore (RetrievalModel r, long docid) {
         return 0.0;
     }
+
+    /**
+     * Not use in this operator!
+     */
+    @Override
+    public void addWeight(Double w) {
+        // Do nothing        
+    }
 }

@@ -38,6 +38,13 @@ public abstract class Qryop {
    *  @throws IOException
    */
   public abstract void add(Qryop q) throws IOException;
+  
+  /**
+   * Add the weight for some operator like WAND & WSUM
+   * @param w
+   * @throws IOException
+   */
+  public abstract void addWeight(Double w);
 
   /**
    *  Use the specified retrieval model to evaluate the query arguments.

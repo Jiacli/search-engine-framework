@@ -210,6 +210,14 @@ public QryResult evaluateRankedBoolean (RetrievalModel r) throws IOException {
     public double getDefaultScore (RetrievalModel r, long docid) {
         return 0.0;
     }
+
+    /**
+     * Not use in this operator!
+     */
+    @Override
+    public void addWeight(Double w) {
+        // Do nothing        
+    }
     
     
 

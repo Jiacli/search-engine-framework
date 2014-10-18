@@ -189,4 +189,12 @@ public class QryopIlWindow extends QryopIl {
         return ("#WINDOW/" + width + "(" + result + ")");
     }
 
+    /**
+     * Not use in this operator!
+     */
+    @Override
+    public void addWeight(Double w) {
+        // Do nothing        
+    }
+
 }

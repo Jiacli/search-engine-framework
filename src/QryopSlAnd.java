@@ -329,4 +329,12 @@ public class QryopSlAnd extends QryopSl {
 
         return ("#AND( " + result + ")");
     }
+
+    /**
+     * Not use in this operator!
+     */
+    @Override
+    public void addWeight(Double w) {
+        // Do nothing        
+    }
 }
