@@ -546,6 +546,10 @@ public class QryEval {
         // Each pass of the loop processes one token. To improve
         // efficiency and clarity, the query operator on the top of the
         // stack is also stored in currentOp.
+        boolean hasWeight = false;
+        boolean gotWeight = false;
+        double weight = 0.0;
+        Stack<Double> wStack = new Stack<Double>();
 
         while (tokens.hasMoreTokens()) {
 
@@ -553,19 +557,40 @@ public class QryEval {
 
             if (token.matches("[ ,(\t\n\r]")) {
                 // Ignore most delimiters.
+            } else if (token.equalsIgnoreCase("#wand")) {
+                hasWeight = true;
+                currentOp = new QryopSlWand();
+                stack.push(currentOp);
+                if (gotWeight) {
+                    wStack.push(weight);
+                    gotWeight = false;
+                }
+            } else if (token.equalsIgnoreCase("#wsum")) {
+                hasWeight = true;
+                currentOp = new QryopSlWsum();
+                stack.push(currentOp);
+                if (gotWeight) {
+                    wStack.push(weight);
+                    gotWeight = false;
+                }
             } else if (token.equalsIgnoreCase("#sum")) {
+                hasWeight = false;
                 currentOp = new QryopSlSum();
                 stack.push(currentOp);
             } else if (token.equalsIgnoreCase("#and")) {
+                hasWeight = false;
                 currentOp = new QryopSlAnd();
                 stack.push(currentOp);
             } else if (token.equalsIgnoreCase("#syn")) {
+                hasWeight = false;
                 currentOp = new QryopIlSyn();
                 stack.push(currentOp);
             } else if (token.equalsIgnoreCase("#or")) {
+                hasWeight = false;
                 currentOp = new QryopSlOr();
                 stack.push(currentOp);
             } else if (token.toLowerCase().startsWith("#near/")) {
+                hasWeight = false;
                 String[] parts = token.split("/");
                 try {
                     currentOp = new QryopIlNear(Integer.parseInt(parts[1]));
@@ -574,6 +599,7 @@ public class QryEval {
                     e.printStackTrace();
                 }
             } else if (token.toLowerCase().startsWith("#window/")) {
+                hasWeight = false;
                 String[] parts = token.split("/");
                 try {
                     currentOp = new QryopIlWindow(Integer.parseInt(parts[1]));
@@ -596,11 +622,33 @@ public class QryEval {
 
                 Qryop arg = currentOp;
                 currentOp = stack.peek();
+                
+                if (currentOp instanceof QryopSlWsum
+                        || currentOp instanceof QryopSlWand) {
+                    hasWeight = true;
+                    if (!wStack.empty()) {
+                        weight = wStack.pop();
+                        gotWeight = true;
+                    }
+                    if (gotWeight) {
+                        currentOp.addWeight(weight);
+                        gotWeight = false;
+                    }
+                }
+                
                 currentOp.add(arg);
             } else {
                 // NOTE: You should do lexical processing of the token before
                 // creating the query term, and you should check to see whether
                 // the token specifies a particular field (e.g., apple.title).
+
+                // check if the arguments have the weights, this is used in
+                // WAND & WSUM operators
+                if (hasWeight && !gotWeight) { // get the weight 
+                    weight = Double.parseDouble(token);
+                    gotWeight = true;
+                    continue;
+                }
 
                 // check if token contains a potential field
                 boolean hasField = false;
@@ -610,15 +658,25 @@ public class QryEval {
                         String term = token.substring(0,
                                 token.length() - str.length() - 1);
                         String[] terms = tokenizeQuery(term);
-                        if (terms.length != 0)
+                        if (terms.length != 0) {
                             currentOp.add(new QryopIlTerm(terms[0], str));
+                            if (hasWeight && gotWeight) {
+                                currentOp.addWeight(weight);
+                                gotWeight = false;
+                            }
+                        }
                         break;
                     }
                 }
                 if (!hasField) {
                     String[] terms = tokenizeQuery(token);
-                    if (terms.length != 0)
+                    if (terms.length != 0) {
                         currentOp.add(new QryopIlTerm(terms[0]));
+                        if (hasWeight) {
+                            currentOp.addWeight(weight);
+                            gotWeight = false;
+                        }
+                    }
                 }
             }
         }
@@ -628,7 +686,7 @@ public class QryEval {
 
         if (tokens.hasMoreTokens()) {
             System.err
-                    .println("Error:  Query syntax is incorrect.  " + qString);
+                    .println("Error:  Query syntax is incorrect. " + qString);
             System.err.println("Error part: " + tokens.nextToken());
             return null;
         }
