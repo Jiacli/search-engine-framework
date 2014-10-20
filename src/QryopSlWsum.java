@@ -107,10 +107,7 @@ public class QryopSlWsum extends QryopSl {
                 }
                 else {
                     // find the default score
-                    if (this.args.get(j) instanceof QryopSlScore)
-                        s = QryopSlScore.class.cast(this.args.get(j)).getDefaultScore(r, minID);
-                    else if (this.args.get(j) instanceof QryopSlAnd)
-                        s = QryopSlAnd.class.cast(this.args.get(j)).getDefaultScore(r, minID);
+                    s = ((QryopSl) this.args.get(j)).getDefaultScore(r, minID);
                 }
                 
                 docScore += (weights.get(j) / wsum) * s;

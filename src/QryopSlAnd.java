@@ -116,10 +116,6 @@ public class QryopSlAnd extends QryopSl {
                 else {
                     // find the default score
                     s = ((QryopSl) this.args.get(j)).getDefaultScore(r, minID);
-                    //if (this.args.get(j) instanceof QryopSlScore)
-                    //    s = QryopSlScore.class.cast(this.args.get(j)).getDefaultScore(r, minID);
-                    //else if (this.args.get(j) instanceof QryopSlAnd)
-                    //    s = QryopSlAnd.class.cast(this.args.get(j)).getDefaultScore(r, minID);
                 }
                 
                 docScore *= Math.pow(s, q);
@@ -302,13 +298,8 @@ public class QryopSlAnd extends QryopSl {
             double p = 1.0 / (double) this.args.size();
             
             for (int i = 0; i < this.args.size(); i++) {
-                
                 s = ((QryopSl) this.args.get(i)).getDefaultScore(r, docid);
-                //if (this.args.get(i) instanceof QryopSlScore)
-                //    s = QryopSlScore.class.cast(this.args.get(i)).getDefaultScore(r, docid);
-                //else if (this.args.get(i) instanceof QryopSlAnd)
-                //    s = QryopSlAnd.class.cast(this.args.get(i)).getDefaultScore(r, docid);
-                
+
                 docScore *= Math.pow(s, p);
             }
             
