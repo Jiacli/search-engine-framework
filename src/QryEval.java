@@ -641,8 +641,8 @@ public class QryEval {
                         gotWeight = false;
                     }
                 }
-                
-                currentOp.add(arg);
+                if (arg.args.size() != 0) // in case of empty operator
+                    currentOp.add(arg);
             } else {
                 // NOTE: You should do lexical processing of the token before
                 // creating the query term, and you should check to see whether
