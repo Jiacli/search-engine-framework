@@ -110,6 +110,7 @@ public class QryopSlWand extends QryopSl {
                     s = ((QryopSl) this.args.get(j)).getDefaultScore(r, minID);
                 }
                 
+                // TODO: what if the default score is 0?
                 docScore *= Math.pow(s, (weights.get(j) / wsum));
             }
             
