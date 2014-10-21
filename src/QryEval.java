@@ -632,7 +632,7 @@ public class QryEval {
                 if (currentOp instanceof QryopSlWsum
                         || currentOp instanceof QryopSlWand) {
                     hasWeight = true;
-                    if (!wStack.empty()) {
+                    if (!wStack.empty() && !gotWeight) {
                         weight = wStack.pop();
                         gotWeight = true;
                     }
