@@ -108,9 +108,12 @@ public class QryopSlWand extends QryopSl {
                 else {
                     // find the default score
                     s = ((QryopSl) this.args.get(j)).getDefaultScore(r, minID);
+                    // handle the case where default score is 0, this
+                    // could happen when an empty score list is created
+                    if (s == 0.0)
+                        continue; // discard this term
                 }
-                
-                // TODO: what if the default score is 0?
+
                 docScore *= Math.pow(s, (weights.get(j) / wsum));
             }
             
@@ -145,6 +148,11 @@ public class QryopSlWand extends QryopSl {
             
             for (int i = 0; i < this.args.size(); i++) {
                 s = ((QryopSl) this.args.get(i)).getDefaultScore(r, docid);
+                
+                // handle the case where default score is 0, this
+                // could happen when an empty score list is created
+                if (s == 0.0)
+                    continue; // discard this term
                 
                 docScore *= Math.pow(s, (weights.get(i) / wsum));
             }

@@ -108,6 +108,11 @@ public class QryopSlWsum extends QryopSl {
                 else {
                     // find the default score
                     s = ((QryopSl) this.args.get(j)).getDefaultScore(r, minID);
+                    // handle the case where default score is 0, this
+                    // could happen when an empty score list is created
+                    // may not affect WSUM, but do so...
+                    if (s == 0.0)
+                        continue; // discard this term
                 }
                 
                 docScore += (weights.get(j) / wsum) * s;
@@ -144,6 +149,12 @@ public class QryopSlWsum extends QryopSl {
             
             for (int i = 0; i < this.args.size(); i++) {
                 s = ((QryopSl) this.args.get(i)).getDefaultScore(r, docid);
+                
+                // handle the case where default score is 0, this
+                // could happen when an empty score list is created
+                // may not affect WSUM, but do so...
+                if (s == 0.0)
+                    continue; // discard this term
                 
                 docScore += (weights.get(i) / wsum) * s;
             }
