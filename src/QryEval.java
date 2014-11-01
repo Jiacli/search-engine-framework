@@ -111,7 +111,7 @@ public class QryEval {
         dls = new DocLengthStore(READER);
 
         /**
-         * Start creating retrieval model
+         *  Start creating retrieval model
          */
 
         // select the retrieval model from the parameter file
@@ -142,7 +142,7 @@ public class QryEval {
         }
 
         /**
-         * Start reading query from file
+         *  Start reading query from file
          */
 
         // read query file path from parameter "queryFilePath"
@@ -173,9 +173,24 @@ public class QryEval {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        
+        /**
+         *  Check whether to do query expansion (feedback)
+         */
+        boolean fb = false;
+        QryExpansion qryFb = null;
+        if (params.containsKey("fb") && "true".equals(params.get("fb"))) {
+            qryFb = new QryExpansion(params);
+            fb = true;
+        }
+        
+        if (fb) {
+            
+        }
+            
 
         /**
-         * Start evaluating query, one query a time
+         *  Start evaluating query, one query a time
          */
 
         long startTime = 0, endTime = 0;
@@ -501,7 +516,7 @@ public class QryEval {
         }
     }
 
-    static String[] term_field = { "url", "keywords", "title", "inlink", "body" };
+    static final String[] term_field = { "url", "keywords", "title", "inlink", "body" };
 
     /**
      * parseQuery converts a query string into a query tree.
@@ -512,7 +527,8 @@ public class QryEval {
      *            A query tree
      * @throws IOException
      */
-    static Qryop parseQuery(String qString, RetrievalModel model) throws IOException {
+    static Qryop parseQuery(String qString, RetrievalModel model)
+            throws IOException {
         Qryop currentOp = null;
         Stack<Qryop> stack = new Stack<Qryop>();
 
@@ -542,7 +558,7 @@ public class QryEval {
         StringTokenizer tokens = new StringTokenizer(qString, "\t\n\r ,()",
                 true);
         String token = null;
-        
+
         // used for operators with the weight arguments
         boolean hasWeight = false;
         boolean gotWeight = false;
@@ -627,7 +643,7 @@ public class QryEval {
 
                 Qryop arg = currentOp;
                 currentOp = stack.peek();
-                
+
                 // check whether the upper operator has weights
                 if (currentOp instanceof QryopSlWsum
                         || currentOp instanceof QryopSlWand) {
@@ -650,7 +666,7 @@ public class QryEval {
 
                 // check if the arguments have the weights, this is used in
                 // WAND & WSUM operators
-                if (hasWeight && !gotWeight) { // get the weight 
+                if (hasWeight && !gotWeight) { // get the weight
                     weight = Double.parseDouble(token);
                     gotWeight = true;
                     continue;
@@ -670,13 +686,12 @@ public class QryEval {
                                 currentOp.addWeight(weight);
                                 gotWeight = false;
                             }
-                        }
-                        else {
+                        } else {
                             // drop the weight for stop words in hasWeight mode
                             if (hasWeight)
                                 gotWeight = false;
                         }
-                        
+
                         break;
                     }
                 }
@@ -688,8 +703,7 @@ public class QryEval {
                             currentOp.addWeight(weight);
                             gotWeight = false;
                         }
-                    }
-                    else {
+                    } else {
                         // drop the weight for stop words in hasWeight mode
                         if (hasWeight)
                             gotWeight = false;
@@ -702,8 +716,7 @@ public class QryEval {
         // stack, so check for that.
 
         if (tokens.hasMoreTokens()) {
-            System.err
-                    .println("Error:  Query syntax is incorrect. " + qString);
+            System.err.println("Error:  Query syntax is incorrect. " + qString);
             System.err.println("Error part: " + tokens.nextToken());
             return null;
         }
