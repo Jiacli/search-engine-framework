@@ -5,7 +5,11 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.lucene.index.Term;
@@ -20,15 +24,19 @@ import org.apache.lucene.index.Term;
  */
 
 public class QryExpansion {
+    
+    private class RankedFile {
+        int docid;
+        double score;
+    }
        
     // This value determines the number of documents to use for query expansion
     int fbDocs;
-    Map<String, ArrayList<Integer>> topRankingFiles;
+    Map<String, ArrayList<RankedFile>> topRankingFiles;
     
     // This value determines the number of terms that are added to the query
     int fbTerms;
     Map<Term, ArrayList<Integer>> topRankingTerms;
-    DocLengthStore s;
     
     // This value determines the amount of smoothing used to calculate p(r|d).
     int fbMu;
@@ -96,13 +104,17 @@ public class QryExpansion {
         }
         
         // read in initial ranking file
+        topRankingFiles = new HashMap<String, ArrayList<RankedFile>>();
+        
         if (params.containsKey("fbInitialRankingFile")) {
-            fbInitialRankingFile = params.get(fbInitialRankingFile);
+            fbInitialRankingFile = params.get("fbInitialRankingFile");
             if (fbInitialRankingFile != null
-                    && fbInitialRankingFile.length() > 0)
+                    && fbInitialRankingFile.length() > 0) {
                 hasInitialRankingFile = true;
-            // TODO: read in initial ranking file
-            LoadInitialRankingFile();
+                
+                // read in initial ranking file
+                LoadInitialRankingFile();
+            }
         }
         
         // open output expansion query file
@@ -117,17 +129,12 @@ public class QryExpansion {
             e.printStackTrace();
         }
         
-        topRankingFiles = new HashMap<String, ArrayList<Integer>>();
         topRankingTerms = new HashMap<Term, ArrayList<Integer>>();
-        try {
-            s = new DocLengthStore(QryEval.READER);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+
     }
 
     
-    void DoQueryExpansion(String query, RetrievalModel model,
+    String DoQueryExpansion(String query, RetrievalModel model,
             boolean isRankedModel) throws IOException {
         // pair[0]: id; pair[1]: query
         String[] pair = query.split(":");
@@ -135,15 +142,19 @@ public class QryExpansion {
         // check if has the initial ranking file
         if (!hasInitialRankingFile) {
             // use original query to retrieve the top-ranked documents
-            Qryop qTree;
-            qTree = QryEval.parseQuery(pair[1], model);
+            Qryop qTree = QryEval.parseQuery(pair[1], model);
             QryResult result = qTree.evaluate(model);
             QryEval.sortResult(result, isRankedModel);
 
             // pick top fbDocs
-            ArrayList<Integer> list = new ArrayList<Integer>();
-            for (int i = 0; i < fbDocs; i++)
-                list.add(result.docScores.scores.get(i).getDocId());
+            ArrayList<RankedFile> list = new ArrayList<RankedFile>();            
+            
+            for (int i = 0; i < fbDocs; i++) {
+                RankedFile file = new RankedFile();
+                file.docid = result.docScores.getDocid(i);
+                file.score = result.docScores.getDocidScore(i);
+                list.add(file);
+            }
             
             topRankingFiles.put(pair[0], list);
         }
@@ -161,75 +172,112 @@ public class QryExpansion {
         Map<String, Double> termScoreMap = new HashMap<String, Double>();
 
         // loop over each document
-        for (Integer docid : topRankingFiles.get(pair[0])) {
-            TermVector tv = new TermVector(docid, "body");
+        for (RankedFile file : topRankingFiles.get(pair[0])) {
+            TermVector tv = new TermVector(file.docid, "body");
+            double score = file.score;
+            double C = (double) QryEval.READER.getSumTotalTermFreq("body");
+            long doclen = QryEval.dls.getDocLength("body", file.docid);
             
             // loop over each term in this document
-            for (Term term : tv.terms) {
-                if (!topRankingTerms.containsKey(term)) {
-                    ArrayList<Integer> list = new ArrayList<Integer>();
-                    list.add(docid);
-                    topRankingTerms.put(term, list);
-                }
-                else
-                    topRankingTerms.get(term).add(docid);
-            }
-        }
-        
-        // Now we have all the terms, score them
-        for (Term term : topRankingTerms.keySet()) {
-            ArrayList<Integer> doclist = topRankingTerms.get(term);
-            double P_mle = QryEval.READER.totalTermFreq(term)
-                    / (double) QryEval.READER.getSumTotalTermFreq("body");
-            
-            double score = Math.log(1 / P_mle);
-            
-            for (Integer docid : doclist) {
+            // i == 0 indicates a stopword, skip that
+            for (int i = 1; i < tv.stems.length; i++) {
+                // System.out.println("Term: " + tv.stems[i] + "\tfreq: " + tv.stemsFreq[i]);
+                int tf = tv.stemsFreq[i];
+
+                double P_mle = tv.totalStemFreq(i) / C;
+
+                double s = (tf + fbMu * P_mle) / (doclen + fbMu) * score
+                        * Math.log(1 / P_mle);
                 
+                if (!termScoreMap.containsKey(tv.stems[i]))
+                    termScoreMap.put(tv.stems[i], s);
+                else
+                    termScoreMap.put(tv.stems[i], s + termScoreMap.get(tv.stems[i]));
             }
-            
         }
         
+        // sort the term score map
+        List<Map.Entry<String,Double>> termlist = new ArrayList<Map.Entry<String,Double>>();
+        termlist.addAll(termScoreMap.entrySet());
+        ValueComparator valueCmp = new ValueComparator();
+        Collections.sort(termlist, valueCmp);
         
+        StringBuilder sb = new StringBuilder("#wand( ");
+        for (int i = 0; i < fbTerms; i++) {
+            sb.append(String.format("%.4f", termlist.get(i).getValue()));
+            sb.append(" ");
+            sb.append(termlist.get(i).getKey());
+            sb.append(" ");
+        }
+        sb.append(")");
+        
+        // write expanded query to file
+        bw.write(pair[0] + ": " + sb.toString() + "\n");
+        
+        String qryLearned = "#wand( " + fbOrigWeight + " #and(" + pair[1] + ") " + (1-fbOrigWeight) + " " + sb.toString() + ")";
+        System.out.println(qryLearned);
+       
+        return qryLearned;      
+    }
+    
+    // comparator to sort hashmap by value
+    private static class ValueComparator implements Comparator<Map.Entry<String,Double>>  
+    {  
+        public int compare(Map.Entry<String,Double>  o1, Map.Entry<String,Double> o2)  
+        {
+            if (o2.getValue() > o1.getValue())
+                return 1;
+            else if (o2.getValue() < o1.getValue())
+                return -1;
+            else
+                return 0;
+        }  
     }
     
     
     
     // Read initial ranking file
     void LoadInitialRankingFile() {
+
         BufferedReader br = null;
-        
         try {
             // open the initial ranking trec_eval format file
             br = new BufferedReader(new FileReader(new File(fbInitialRankingFile)));
             
             // read only top fbDocs files
             String line = null;
-            int n = 0;
             
-            while ((line = br.readLine()) != null && n < fbDocs) {
+            while ((line = br.readLine()) != null) {
                 String[] part = line.split(" ");
                 if (part.length != 6) {
                     System.out.println("ReadInitialRanking: Invalid trac_eval format!");
                     continue;
                 }
                 
-                // part[0] query id; part[2] docid; part[3] rank
+                // part[0] query id; part[2] docid; part[3] rank; part[4] score
                 int rank = Integer.parseInt(part[3]);
                 if (rank > fbDocs) // in case the input file is not sorted
                     continue;
                 
                 int docid = QryEval.getInternalDocid(part[2]);
+                double score = Double.parseDouble(part[4]);
                 
                 if (!topRankingFiles.containsKey(part[0])) {
-                    ArrayList<Integer> list = new ArrayList<Integer>();
-                    list.add(docid);
+                    ArrayList<RankedFile> list = new ArrayList<RankedFile>();
+                    RankedFile file = new RankedFile();
+                    file.docid = docid;
+                    file.score = score;
+                    list.add(file);
                     topRankingFiles.put(part[0], list);
                 }                    
-                else
-                    topRankingFiles.get(part[0]).add(docid);
+                else {
+                    RankedFile file = new RankedFile();
+                    file.docid = docid;
+                    file.score = score;
+                    
+                    topRankingFiles.get(part[0]).add(file);
+                }
 
-                n++;
             }
 
         } catch (Exception e) {

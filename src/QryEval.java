@@ -182,12 +182,7 @@ public class QryEval {
         if (params.containsKey("fb") && "true".equals(params.get("fb"))) {
             qryFb = new QryExpansion(params);
             fb = true;
-        }
-        
-        if (fb) {
-            
-        }
-            
+        }            
 
         /**
          *  Start evaluating query, one query a time
@@ -201,6 +196,10 @@ public class QryEval {
 
             // measure the running time
             startTime = System.currentTimeMillis();
+            
+            // check whether need to do query expansion
+            if (fb)
+                pair[1] = qryFb.DoQueryExpansion(query, model, isRankedModel);
 
             // applying query parser
             Qryop qTree = parseQuery(pair[1], model);
@@ -223,6 +222,7 @@ public class QryEval {
             }
         }
         bw.close();
+        qryFb.bw.close();
 
         // Total running time
         System.out.println("Total running time: " + totalTime + "s");
