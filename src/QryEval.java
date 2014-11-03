@@ -166,9 +166,9 @@ public class QryEval {
         }
 
         // create output file
-        BufferedWriter br = null;
+        BufferedWriter bw = null;
         try {
-            br = new BufferedWriter(new FileWriter(new File(
+            bw = new BufferedWriter(new FileWriter(new File(
                     params.get("trecEvalOutputPath"))));
         } catch (Exception e) {
             e.printStackTrace();
@@ -217,12 +217,12 @@ public class QryEval {
 
             // write result to trec_eval output
             try {
-                writeResultToFile(br, pair[0], result, isRankedModel);
+                writeResultToFile(bw, pair[0], result, isRankedModel);
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
-        br.close();
+        bw.close();
 
         // Total running time
         System.out.println("Total running time: " + totalTime + "s");
@@ -244,12 +244,7 @@ public class QryEval {
         // Lookup the document length of the body field of doc 0.
         // System.out.println(s.getDocLength("body", 0));
 
-        // How to use the term vector.
-        // TermVector tv = new TermVector(1, "body");
-        // System.out.println(tv.stemString(10)); // get the string for the 10th
-        // stem
-        // System.out.println(tv.stemDf(10)); // get its df
-        // System.out.println(tv.totalStemFreq(10)); // get its ctf
+        
     }
 
     /**
