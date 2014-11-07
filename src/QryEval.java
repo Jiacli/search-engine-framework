@@ -222,7 +222,8 @@ public class QryEval {
             }
         }
         bw.close();
-        qryFb.bw.close();
+        if (fb)
+            qryFb.bw.close();
 
         // Total running time
         System.out.println("Total running time: " + totalTime + "s");
