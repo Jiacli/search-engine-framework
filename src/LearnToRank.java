@@ -44,12 +44,12 @@ public class LearnToRank {
             sb.append(qid);
             for (int i = 0; i < feat.length; i++) {
                 sb.append(" ");
-                sb.append(i);
+                sb.append(i+1);
                 sb.append(":");
                 if (!Double.isNaN(feat[i])) {
                     sb.append(feat[i]);
                 } else {
-                    sb.append("0.0");
+                    sb.append("0");
                 }
             }
             sb.append(" # ");
@@ -110,13 +110,16 @@ public class LearnToRank {
         // load relevance judgments file
         scan = new Scanner(new File(trainingQrelsFile));
         while (scan.hasNext()) {
-            String relfile = scan.nextLine();
-            String id = relfile.split(" ")[0];
+            String line = scan.nextLine();
+            if (line.length() == 0)
+                continue;
+            
+            String id = line.split(" ")[0];
             if (!qryRelsMap.containsKey(id)) {
                 System.out.println("Warnin(gLeToR): training query id not complete!");
                 qryRelsMap.put(id, new ArrayList<String>());
             }
-            qryRelsMap.get(id).add(relfile);
+            qryRelsMap.get(id).add(line);
         }
         scan.close();
         
@@ -267,6 +270,7 @@ public class LearnToRank {
             // write feature vector to file
             for (SVMFeat svmFeat : featList) {
                 bw.write(svmFeat.featString());
+                bw.flush();
             }
         }
     }
@@ -308,14 +312,14 @@ public class LearnToRank {
                 if (bm25Map_body.containsKey(extid))
                     f[4] = bm25Map_body.get(extid);
                 else
-                    f[4] = Double.NaN;
+                    f[4] = 0.0;
             }
 
             if (!Double.isNaN(f[5])) {
                 if (indriMap_body.containsKey(extid))
                     f[5] = indriMap_body.get(extid);
                 else
-                    f[5] = Double.NaN;
+                    f[5] = 0.0;
             }
 
             if (!Double.isNaN(f[6])) {
@@ -344,9 +348,9 @@ public class LearnToRank {
             }
         } else {
             System.out.println("Doc missing field: " + docid + " " + "body");
-            f[4] = Double.NaN;
-            f[5] = Double.NaN;
-            f[6] = Double.NaN;
+            f[4] = 0.0;
+            f[5] = 0.0;
+            f[6] = 0.0;
         }
         
         // f8,f9,f10: score for <q, d_title>
@@ -356,14 +360,14 @@ public class LearnToRank {
                 if (bm25Map_title.containsKey(extid))
                     f[7] = bm25Map_title.get(extid);
                 else
-                    f[7] = Double.NaN;
+                    f[7] = 0.0;
             }
                 
             if (!Double.isNaN(f[8])) {
                 if (indriMap_title.containsKey(extid))
                     f[8] = indriMap_title.get(extid);
                 else
-                    f[8] = Double.NaN;
+                    f[8] = 0.0;
             }
 
             if (!Double.isNaN(f[9])) {
@@ -392,9 +396,9 @@ public class LearnToRank {
             }
         } else {
             System.out.println("Doc missing field: " + docid + " " + "title");
-            f[7] = Double.NaN;
-            f[8] = Double.NaN;
-            f[9] = Double.NaN;
+            f[7] = 0.0;
+            f[8] = 0.0;
+            f[9] = 0.0;
         }
 
         // f11,f12,f13: score for <q, d_url>
@@ -404,7 +408,7 @@ public class LearnToRank {
                 if (bm25Map_url.containsKey(extid))
                     f[10] = bm25Map_url.get(extid);
                 else {
-                    f[10] = Double.NaN;
+                    f[10] = 0.0;
                 }
             }
                 
@@ -413,7 +417,7 @@ public class LearnToRank {
                 if (indriMap_url.containsKey(extid))
                     f[11] = indriMap_url.get(extid);
                 else {
-                    f[11] = Double.NaN;
+                    f[11] = 0.0;
                 }
             }
                 
@@ -444,27 +448,27 @@ public class LearnToRank {
             }
         } else {
             System.out.println("Doc missing field: " + docid + " " + "url");
-            f[10] = Double.NaN;
-            f[11] = Double.NaN;
-            f[12] = Double.NaN;
+            f[10] = 0.0;
+            f[11] = 0.0;
+            f[12] = 0.0;
         }
 
-        // f14,f15,f16: score for <q, d_body>
+        // f14,f15,f16: score for <q, d_inlink>
         terms = QryEval.READER.getTermVector(docid, "inlink");
         if (terms != null) {
             if (!Double.isNaN(f[13])) {
-                if (bm25Map_body.containsKey(extid))
-                    f[13] = bm25Map_body.get(extid);
+                if (bm25Map_inlink.containsKey(extid))
+                    f[13] = bm25Map_inlink.get(extid);
                 else {
-                    f[13] = Double.NaN;
+                    f[13] = 0.0;
                 }
             }
                 
             if (!Double.isNaN(f[14])) {
-                if (indriMap_body.containsKey(extid))
-                    f[14] = indriMap_body.get(extid);
+                if (indriMap_inlink.containsKey(extid))
+                    f[14] = indriMap_inlink.get(extid);
                 else
-                    f[14] = Double.NaN;                    
+                    f[14] = 0.0;                    
             }
         
             if (!Double.isNaN(f[15])) {
@@ -493,9 +497,9 @@ public class LearnToRank {
             }
         } else {
             System.out.println("Doc missing field: " + docid + " " + "inlink");
-            f[13] = Double.NaN;
-            f[14] = Double.NaN;
-            f[15] = Double.NaN;
+            f[13] = 0.0;
+            f[14] = 0.0;
+            f[15] = 0.0;
         }
         
         // personal feat f17, f18
