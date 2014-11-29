@@ -117,6 +117,8 @@ public class QryEval {
         // select the retrieval model from the parameter file
         RetrievalModel model = null;
         boolean isRankedModel = false;
+        boolean learningToRank = false;
+        LearnToRank letor = null;
 
         if (!params.containsKey("retrievalAlgorithm")) {
             System.err
@@ -135,6 +137,9 @@ public class QryEval {
         } else if (params.get("retrievalAlgorithm").equals("Indri")) {
             model = new RetrievalModelIndri(params);
             isRankedModel = true;
+        } else if (params.get("retrievalAlgorithm").equals("letor")) {
+            letor = new LearnToRank(params);
+            learningToRank = true;
         } else {
             System.err.println("Error: 'retrievalAlgorithm' parameter("
                     + params.get("retrievalAlgorithm") + ") was undefined.");
@@ -182,70 +187,79 @@ public class QryEval {
         if (params.containsKey("fb") && "true".equals(params.get("fb"))) {
             qryFb = new QryExpansion(params);
             fb = true;
-        }            
-
+        }
+        
         /**
          *  Start evaluating query, one query a time
          */
-
         long startTime = 0, endTime = 0;
         double totalTime = 0;
-        for (String query : queryList) {
-            System.out.println("input: " + query);
-            String[] pair = query.split(":"); // separate queryID and query
+        
+        // check if running in learning to rank mode
+        if (!learningToRank) {
 
-            // measure the running time
-            startTime = System.currentTimeMillis();
-            
-            // check whether need to do query expansion
-            if (fb)
-                pair[1] = qryFb.DoQueryExpansion(query, model, isRankedModel);
+            for (String query : queryList) {
+                System.out.println("input: " + query);
+                String[] pair = query.split(":"); // separate queryID and query
 
-            // applying query parser
-            Qryop qTree = parseQuery(pair[1], model);
-            QryResult result = qTree.evaluate(model);
+                // measure the running time
+                startTime = System.currentTimeMillis();
+                
+                // check whether need to do query expansion
+                if (fb) {
+                    pair[1] = qryFb.DoQueryExpansion(query, model, isRankedModel);
+                }
+                // applying query parser
+                Qryop qTree = parseQuery(pair[1], model);
+                QryResult result = qTree.evaluate(model);
 
-            // sort the result first anyway
-            sortResult(result, isRankedModel);
+                // sort the result first anyway
+                sortResult(result, isRankedModel);
 
-            // calculate the running time
-            endTime = System.currentTimeMillis();
-            System.out.println("Running time: "
-                    + ((endTime - startTime) / 1000.0) + "s");
-            totalTime += (endTime - startTime) / 1000.0;
+                // calculate the running time
+                endTime = System.currentTimeMillis();
+                System.out.println("Running time: "
+                        + ((endTime - startTime) / 1000.0) + "s");
+                totalTime += (endTime - startTime) / 1000.0;
 
-            // write result to trec_eval output
-            try {
-                writeResultToFile(bw, pair[0], result, isRankedModel);
-            } catch (Exception e) {
-                e.printStackTrace();
+                // write result to trec_eval output
+                try {
+                    writeResultToFile(bw, pair[0], result, isRankedModel);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
-        }
-        bw.close();
-        if (fb)
-            qryFb.bw.close();
+            bw.close();
+            if (fb)
+                qryFb.bw.close();
 
-        // Total running time
-        System.out.println("Total running time: " + totalTime + "s");
+            // Total running time
+            System.out.println("Total running time: " + totalTime + "s");
+            
+        } else { // learning to rank modes
+            letor.generateTrainingFeat();
+            
+            letor.runSVMtrain();
+            
+            letor.generateTestFeat(queryList);
+            
+            letor.runSVMclassify();
+            
+            letor.getRerankList(bw);
+            
+            bw.close();
+            
+            endTime = System.currentTimeMillis();
+            System.out.println("Total running time: "
+                    + ((endTime - startTime) / 1000.0) + "s");
+        }
+
+        
 
         // Later HW assignments will use more RAM, so you want to be aware
         // of how much memory your program uses.
         printMemoryUsage(false);
-
-        // NOTE: FOLLOWING CODES ARE RESERVED FOR HW2 & HW3
-
-        /*
-         * The code below is an unorganized set of examples that show you
-         * different ways of accessing the index. Some of these are only useful
-         * in HW2 or HW3.
-         */
-
-        // DocLengthStore s = new DocLengthStore(READER);
-
-        // Lookup the document length of the body field of doc 0.
-        // System.out.println(s.getDocLength("body", 0));
-
-        
+       
     }
 
     /**
