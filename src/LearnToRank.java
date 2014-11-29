@@ -620,26 +620,77 @@ public class LearnToRank {
         bw_tst.close();
     }
     
+    public ArrayList<String> getRerankList(BufferedWriter out) throws Exception {
+        ArrayList<String> rerankList = new ArrayList<String>();        
+        ArrayList<String> feats = new ArrayList<String>();
+        ArrayList<Double> scores = new ArrayList<Double>();
+        
+        // load feat seq
+        Scanner scan = new Scanner(new File(testingFeatureVectorsFile));
+        String line = null;
+        while (scan.hasNext()) {
+            line = scan.nextLine();
+            if (line.length() != 0) {
+                String[] seg = line.split(" ");
+                String qid = seg[1];
+                String extid = seg[seg.length - 1];
+
+                feats.add(qid.split(":")[1] + "\t" + extid);
+            }
+        }
+        scan.close();
+        
+        // load score seq
+        scan = new Scanner(new File(testingDocumentScores));
+        while (scan.hasNext()) {
+            line = scan.nextLine();
+            if (line.length() != 0)
+                scores.add(Double.valueOf(line));            
+        }
+        scan.close();
+        
+        if (feats.size() != scores.size()) {
+            QryEval.fatalError("Error(LeToR): feature and re-rank score sizes mismatch!");
+        }
+        
+        HashMap<String, Double> map = new HashMap<String, Double>();
+        String qid = feats.get(0).split("\t")[0];
+        for (int i = 0; i < feats.size(); i++) {
+            // seg[0]: qid, seg[1]: extid
+            String[] seg = feats.get(i).split("\t");
+            if (qid.equals(seg[0])) {
+                map.put(seg[1],scores.get(i));
+            } else {
+                // sort and output
+                ArrayList
+            }
+        }
+        
+        
+        
+        return null;
+    }
+    
     private ArrayList<String> getInitialRanking(String query) throws Exception {
         System.out.println("Test Query: " + query);
         
         QryResult result = QryEval.parseQuery(query, BM25).evaluate(BM25);
         QryEval.sortResult(result, true);
         
-        ArrayList<String> topfiles = new ArrayList<String>();
+        ArrayList<String> topfilelist = new ArrayList<String>();
         
         int bound = Math.min(100, result.docScores.scores.size());
         for (int i = 0; i < bound; i++) {
             String extid = result.docScores.scores.get(i).extId;
             if (extid != null)
-                topfiles.add(extid);
+                topfilelist.add(extid);
             else {
                 int docid = result.docScores.getDocid(i);
-                topfiles.add(QryEval.getExternalDocid(docid));
+                topfilelist.add(QryEval.getExternalDocid(docid));
             }
         }
         
-        return topfiles;
+        return topfilelist;
     }
     
     private void checkParams(Map<String, String> params) {
@@ -734,6 +785,42 @@ public class LearnToRank {
           throw new Exception("SVM Rank crashed.");
         } else {
             System.out.println("SVM training completed!");
+        }
+    }
+    
+    public void runSVMclassify() throws Exception {
+        System.out.println("Run SVM ranking...");
+        // runs svm_rank_learn from within Java to train the model
+        // execPath is the location of the svm_rank_learn utility, 
+        // which is specified by letor:svmRankLearnPath in the parameter file.
+        // FEAT_GEN.c is the value of the letor:c parameter.
+        Process cmdProc = Runtime.getRuntime().exec(
+                new String[] { svmRankClassifyPath, testingFeatureVectorsFile,
+                        svmRankModelFile, testingDocumentScores });
+
+        // The stdout/stderr consuming code MUST be included.
+        // It prevents the OS from running out of output buffer space and stalling.
+
+        // consume stdout and print it out for debugging purposes
+        BufferedReader stdoutReader = new BufferedReader(
+            new InputStreamReader(cmdProc.getInputStream()));
+        String line;
+        while ((line = stdoutReader.readLine()) != null) {
+          System.out.println(line);
+        }
+        // consume stderr and print it for debugging purposes
+        BufferedReader stderrReader = new BufferedReader(
+            new InputStreamReader(cmdProc.getErrorStream()));
+        while ((line = stderrReader.readLine()) != null) {
+          System.out.println(line);
+        }
+
+        // get the return value from the executable. 0 means success, non-zero 
+        // indicates a problem
+        if (cmdProc.waitFor() != 0) {
+          throw new Exception("SVM Rank crashed.");
+        } else {
+            System.out.println("SVM scoring completed!");
         }
     }
 }
