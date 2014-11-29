@@ -46,13 +46,11 @@ public class LearnToRank {
             sb.append(" qid:");
             sb.append(qid);
             for (int i = 0; i < feat.length; i++) {
-                sb.append(" ");
-                sb.append(i + 1);
-                sb.append(":");
                 if (!Double.isNaN(feat[i])) {
+                    sb.append(" ");
+                    sb.append(i + 1);
+                    sb.append(":");
                     sb.append(feat[i]);
-                } else {
-                    sb.append("0");
                 }
             }
             sb.append(" # ");
@@ -301,6 +299,7 @@ public class LearnToRank {
     private void setFeatValue(double[] f, String extid, String qry)
             throws Exception {
         int docid = QryEval.getInternalDocid(extid);
+        String[] tokens = QryEval.tokenizeQuery(qry);
 
         Document d = QryEval.READER.document(docid);
         // f1: spam score
@@ -355,12 +354,11 @@ public class LearnToRank {
                     stems[i] = ithTerm.term().utf8ToString();
                 }
 
-                String[] qryTerms = qry.split(" ");
-                for (String qryTerm : qryTerms) {
-                    if (qryTerm.length() != 0) {
+                for (String token : tokens) {
+                    if (token.length() != 0) {
                         allValid++;
-                        for (String stem : stems) {
-                            if (qryTerm.equals(stem)) {
+                        for (int i = 1; i<stems.length; i++) {
+                            if (token.equals(stems[i])) {
                                 match++;
                                 break;
                             }
@@ -372,9 +370,9 @@ public class LearnToRank {
             }
         } else {
             // System.out.println("Doc missing field: " + docid + " " + "body");
-            f[4] = 0.0;
-            f[5] = 0.0;
-            f[6] = 0.0;
+            f[4] = Double.NaN;
+            f[5] = Double.NaN;
+            f[6] = Double.NaN;
         }
 
         // f8,f9,f10: score for <q, d_title>
@@ -403,12 +401,11 @@ public class LearnToRank {
                     stems[i] = ithTerm.term().utf8ToString();
                 }
 
-                String[] qryTerms = qry.split(" ");
-                for (String qryTerm : qryTerms) {
-                    if (qryTerm.length() != 0) {
+                for (String token : tokens) {
+                    if (token.length() != 0) {
                         allValid++;
-                        for (String stem : stems) {
-                            if (qryTerm.equals(stem)) {
+                        for (int i = 1; i<stems.length; i++) {
+                            if (token.equals(stems[i])) {
                                 match++;
                                 break;
                             }
@@ -421,9 +418,9 @@ public class LearnToRank {
         } else {
             // System.out.println("Doc missing field: " + docid + " " +
             // "title");
-            f[7] = 0.0;
-            f[8] = 0.0;
-            f[9] = 0.0;
+            f[7] = Double.NaN;
+            f[8] = Double.NaN;
+            f[9] = Double.NaN;
         }
 
         // f11,f12,f13: score for <q, d_url>
@@ -454,12 +451,11 @@ public class LearnToRank {
                     stems[i] = ithTerm.term().utf8ToString();
                 }
 
-                String[] qryTerms = qry.split(" ");
-                for (String qryTerm : qryTerms) {
-                    if (qryTerm.length() != 0) {
+                for (String token : tokens) {
+                    if (token.length() != 0) {
                         allValid++;
-                        for (String stem : stems) {
-                            if (qryTerm.equals(stem)) {
+                        for (int i = 1; i<stems.length; i++) {
+                            if (token.equals(stems[i])) {
                                 match++;
                                 break;
                             }
@@ -471,9 +467,9 @@ public class LearnToRank {
             }
         } else {
             // System.out.println("Doc missing field: " + docid + " " + "url");
-            f[10] = 0.0;
-            f[11] = 0.0;
-            f[12] = 0.0;
+            f[10] = Double.NaN;
+            f[11] = Double.NaN;
+            f[12] = Double.NaN;
         }
 
         // f14,f15,f16: score for <q, d_inlink>
@@ -503,12 +499,11 @@ public class LearnToRank {
                     stems[i] = ithTerm.term().utf8ToString();
                 }
 
-                String[] qryTerms = qry.split(" ");
-                for (String qryTerm : qryTerms) {
-                    if (qryTerm.length() != 0) {
+                for (String token : tokens) {
+                    if (token.length() != 0) {
                         allValid++;
-                        for (String stem : stems) {
-                            if (qryTerm.equals(stem)) {
+                        for (int i = 1; i<stems.length; i++) {
+                            if (token.equals(stems[i])) {
                                 match++;
                                 break;
                             }
@@ -521,9 +516,9 @@ public class LearnToRank {
         } else {
             // System.out.println("Doc missing field: " + docid + " " +
             // "inlink");
-            f[13] = 0.0;
-            f[14] = 0.0;
-            f[15] = 0.0;
+            f[13] = Double.NaN;
+            f[14] = Double.NaN;
+            f[15] = Double.NaN;
         }
 
         // personal feat f17, f18
@@ -703,6 +698,7 @@ public class LearnToRank {
                     sb.append(" ");
                     sb.append(entry.getValue());
                     sb.append(" Run\n");
+//                    System.out.println(sb.toString());
                     out.write(sb.toString());
                     out.flush();
                 }
@@ -731,6 +727,7 @@ public class LearnToRank {
                 sb.append(" ");
                 sb.append(entry.getValue());
                 sb.append(" Run\n");
+//                System.out.println(sb.toString());
                 out.write(sb.toString());
                 out.flush();
             }
