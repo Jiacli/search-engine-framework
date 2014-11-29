@@ -1,7 +1,9 @@
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -81,9 +83,9 @@ public class LearnToRank {
     RetrievalModel Indri;
     RetrievalModel BM25;
     
-    BufferedWriter bw;
+    BufferedWriter bw, bw_tst;
     
-
+    // constructor
     public LearnToRank(Map<String, String> params) throws Exception {
         // check the existence of the parameters
         checkParams(params);
@@ -141,7 +143,21 @@ public class LearnToRank {
         
         // training feature writer
         bw = new BufferedWriter(new FileWriter(trainingFeatureVectorsFile));
-          
+        // test feature writer
+        bw_tst = new BufferedWriter(new FileWriter(testingFeatureVectorsFile));
+        
+        // initial variables
+        bm25Map_body = new HashMap<String, Double>();
+        bm25Map_url = new HashMap<String, Double>();
+        bm25Map_title = new HashMap<String, Double>();
+        bm25Map_inlink = new HashMap<String, Double>();
+        
+        indriMap_body = new HashMap<String, Double>();
+        indriMap_url = new HashMap<String, Double>();
+        indriMap_title = new HashMap<String, Double>();
+        indriMap_inlink = new HashMap<String, Double>();
+        
+        featList = new ArrayList<SVMFeat>();
     }
     
     // variables and functions for training data generating
@@ -155,6 +171,8 @@ public class LearnToRank {
     private HashMap<String, Double> indriMap_title;
     private HashMap<String, Double> indriMap_inlink;
     
+    ArrayList<SVMFeat> featList;
+    
     private void cleanUp() {
         bm25Map_body.clear();
         bm25Map_url.clear();
@@ -164,20 +182,12 @@ public class LearnToRank {
         indriMap_url.clear();
         indriMap_title.clear();
         indriMap_inlink.clear();
+        featList.clear();
     }
     
     public void generateTrainingFeat() throws Exception {
         String qryBody, qryUrl, qryTitle, qryInlink;
-        bm25Map_body = new HashMap<String, Double>();
-        bm25Map_url = new HashMap<String, Double>();
-        bm25Map_title = new HashMap<String, Double>();
-        bm25Map_inlink = new HashMap<String, Double>();
         
-        indriMap_body = new HashMap<String, Double>();
-        indriMap_url = new HashMap<String, Double>();
-        indriMap_title = new HashMap<String, Double>();
-        indriMap_inlink = new HashMap<String, Double>();
-
         for (String query : trainQryList) {
             // clean up;
             cleanUp();
@@ -209,14 +219,12 @@ public class LearnToRank {
             QryResult indri_inlink = QryEval.parseQuery(qryInlink, Indri).evaluate(Indri);
             buildMap(indri_inlink,indriMap_inlink);
             
-//            System.out.println(qryBody+"\n"+qryUrl+"\n"+qryInlink+"\n"+qryTitle);
             if (!qryRelsMap.containsKey(pair[0])) {
                 System.err.println("Error(LeToR): Missing relevance judgment docs!");
                 continue;
             }
             ArrayList<String> relFileList = qryRelsMap.get(pair[0]);
-            ArrayList<SVMFeat> featList = new ArrayList<SVMFeat>();
-            
+
             for (String item : relFileList) {
                 double[] feat = new double[18];
                 for (int i = 0; i < feat.length; i++) {
@@ -272,7 +280,8 @@ public class LearnToRank {
                 bw.write(svmFeat.featString());
                 bw.flush();
             }
-        }
+        }        
+        bw.close();
     }
     
     private void setFeatValue(double[] f, String extid, String qry) throws Exception {
@@ -516,7 +525,122 @@ public class LearnToRank {
         }
     }
 
+    public void generateTestFeat(ArrayList<String> testQry) throws Exception {
+        String qryBody, qryUrl, qryTitle, qryInlink;
+
+        for (String query : testQry) {
+            // clean up;
+            cleanUp();
+            
+            // use existing code to generate 8 features for each document
+            String[] pair = query.split(":"); // pair[0]:id pair[1] words
+            qryBody = pair[1].trim()+" ";
+            qryUrl = qryBody.replaceAll(" ", ".url ");
+            qryTitle = qryBody.replaceAll(" ", ".title ");
+            qryInlink = qryBody.replaceAll(" ", ".inlink ");
+
+            // BM25
+            QryResult bm25_body = QryEval.parseQuery(qryBody, BM25).evaluate(BM25);
+            buildMap(bm25_body,bm25Map_body);
+            QryResult bm25_url = QryEval.parseQuery(qryUrl, BM25).evaluate(BM25);
+            buildMap(bm25_url,bm25Map_url);
+            QryResult bm25_title = QryEval.parseQuery(qryTitle, BM25).evaluate(BM25);
+            buildMap(bm25_title,bm25Map_title);
+            QryResult bm25_inlink = QryEval.parseQuery(qryInlink, BM25).evaluate(BM25);
+            buildMap(bm25_inlink,bm25Map_inlink);
+            
+            // Indri
+            QryResult indri_body = QryEval.parseQuery(qryBody, Indri).evaluate(Indri);
+            buildMap(indri_body,indriMap_body);
+            QryResult indri_url = QryEval.parseQuery(qryUrl, Indri).evaluate(Indri);
+            buildMap(indri_url,indriMap_url);
+            QryResult indri_title = QryEval.parseQuery(qryTitle, Indri).evaluate(Indri);
+            buildMap(indri_title,indriMap_title);
+            QryResult indri_inlink = QryEval.parseQuery(qryInlink, Indri).evaluate(Indri);
+            buildMap(indri_inlink,indriMap_inlink);
+            
+            // generate initial BM25 ranking
+            ArrayList<String> initRankList = getInitialRanking(qryBody);
+            
+            for (String item : initRankList) {
+                double[] feat = new double[18];
+                for (int i = 0; i < feat.length; i++) {
+                    if (!featValid[i])
+                        feat[i] = Double.NaN;
+                }
+
+                setFeatValue(feat, item, qryBody.trim());
+                // add feat to list for future normalization
+                featList.add(new SVMFeat("0", pair[0], feat, item));
+            }
+            
+            // normalization
+            double[] maxVal = new double[18];
+            double[] minVal = new double[18];
+            for (int i = 0; i < maxVal.length; i++) {
+                maxVal[i] = Double.MIN_VALUE;
+                minVal[i] = Double.MAX_VALUE;
+            }
+            
+            // find max, min for each feature
+            for (SVMFeat svmFeat : featList) {
+                for (int i = 0; i < svmFeat.feat.length; i++) {
+                    if (!Double.isNaN(svmFeat.feat[i])) {
+                        if (svmFeat.feat[i] > maxVal[i])
+                            maxVal[i] = svmFeat.feat[i];
+                        if (svmFeat.feat[i] < minVal[i])
+                            minVal[i] = svmFeat.feat[i];
+                    }
+                }
+            }
+            
+            // do normalization
+            for (int i = 0; i < maxVal.length; i++) {
+                if (maxVal[i] != minVal[i]) {
+                    double norm = maxVal[i] - minVal[i];
+                    for (SVMFeat svmFeat : featList) {
+                        if (!Double.isNaN(svmFeat.feat[i])) {
+                            svmFeat.feat[i] = (svmFeat.feat[i] - minVal[i]) / norm;
+                        }                            
+                    }
+                } else {
+                    for (SVMFeat svmFeat : featList) {
+                        if (!Double.isNaN(svmFeat.feat[i]))
+                            svmFeat.feat[i] = 0.0;
+                    }
+                }
+            }
+            
+            // write feature vector to file
+            for (SVMFeat svmFeat : featList) {
+                bw_tst.write(svmFeat.featString());
+                bw_tst.flush();
+            }
+        }
+        bw_tst.close();
+    }
     
+    private ArrayList<String> getInitialRanking(String query) throws Exception {
+        System.out.println("Test Query: " + query);
+        
+        QryResult result = QryEval.parseQuery(query, BM25).evaluate(BM25);
+        QryEval.sortResult(result, true);
+        
+        ArrayList<String> topfiles = new ArrayList<String>();
+        
+        int bound = Math.min(100, result.docScores.scores.size());
+        for (int i = 0; i < bound; i++) {
+            String extid = result.docScores.scores.get(i).extId;
+            if (extid != null)
+                topfiles.add(extid);
+            else {
+                int docid = result.docScores.getDocid(i);
+                topfiles.add(QryEval.getExternalDocid(docid));
+            }
+        }
+        
+        return topfiles;
+    }
     
     private void checkParams(Map<String, String> params) {
         if (!params.containsKey("letor:trainingQueryFile")
@@ -573,6 +697,43 @@ public class LearnToRank {
             } catch (Exception e) {
                 e.printStackTrace();
             }
+        }
+    }
+
+    public void runSVMtrain() throws Exception {
+        System.out.println("Start SVM training...");
+        // runs svm_rank_learn from within Java to train the model
+        // execPath is the location of the svm_rank_learn utility, 
+        // which is specified by letor:svmRankLearnPath in the parameter file.
+        // FEAT_GEN.c is the value of the letor:c parameter.
+        Process cmdProc = Runtime.getRuntime().exec(
+                new String[] { svmRankLearnPath, "-c",
+                        String.valueOf(svmRankParamC),
+                        trainingFeatureVectorsFile, svmRankModelFile });
+
+        // The stdout/stderr consuming code MUST be included.
+        // It prevents the OS from running out of output buffer space and stalling.
+
+        // consume stdout and print it out for debugging purposes
+        BufferedReader stdoutReader = new BufferedReader(
+            new InputStreamReader(cmdProc.getInputStream()));
+        String line;
+        while ((line = stdoutReader.readLine()) != null) {
+          System.out.println(line);
+        }
+        // consume stderr and print it for debugging purposes
+        BufferedReader stderrReader = new BufferedReader(
+            new InputStreamReader(cmdProc.getErrorStream()));
+        while ((line = stderrReader.readLine()) != null) {
+          System.out.println(line);
+        }
+
+        // get the return value from the executable. 0 means success, non-zero 
+        // indicates a problem
+        if (cmdProc.waitFor() != 0) {
+          throw new Exception("SVM Rank crashed.");
+        } else {
+            System.out.println("SVM training completed!");
         }
     }
 }
