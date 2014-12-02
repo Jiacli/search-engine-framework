@@ -237,6 +237,9 @@ public class QryEval {
             System.out.println("Total running time: " + totalTime + "s");
             
         } else { // learning to rank modes
+            // measure the running time
+            startTime = System.currentTimeMillis();
+            
             letor.generateTrainingFeat();
             
             letor.runSVMtrain();
@@ -253,9 +256,6 @@ public class QryEval {
             System.out.println("Total running time: "
                     + ((endTime - startTime) / 1000.0) + "s");
         }
-
-        
-
         // Later HW assignments will use more RAM, so you want to be aware
         // of how much memory your program uses.
         printMemoryUsage(false);

@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Scanner;
 
 import org.apache.lucene.document.Document;
+import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
 
@@ -148,29 +149,32 @@ public class LearnToRank {
         bw_tst = new BufferedWriter(new FileWriter(testingFeatureVectorsFile));
 
         // initial variables
-        bm25Map_body = new HashMap<String, Double>();
-        bm25Map_url = new HashMap<String, Double>();
-        bm25Map_title = new HashMap<String, Double>();
-        bm25Map_inlink = new HashMap<String, Double>();
+        bm25Map_body = new HashMap<Integer, Double>();
+        bm25Map_url = new HashMap<Integer, Double>();
+        bm25Map_title = new HashMap<Integer, Double>();
+        bm25Map_inlink = new HashMap<Integer, Double>();
 
-        indriMap_body = new HashMap<String, Double>();
-        indriMap_url = new HashMap<String, Double>();
-        indriMap_title = new HashMap<String, Double>();
-        indriMap_inlink = new HashMap<String, Double>();
+        indriMap_body = new HashMap<Integer, Double>();
+        indriMap_url = new HashMap<Integer, Double>();
+        indriMap_title = new HashMap<Integer, Double>();
+        indriMap_inlink = new HashMap<Integer, Double>();
 
+        indriMap_SDM = new HashMap<Integer, Double>();
         featList = new ArrayList<SVMFeat>();
     }
 
     // variables and functions for training data generating
-    private HashMap<String, Double> bm25Map_body;
-    private HashMap<String, Double> bm25Map_url;
-    private HashMap<String, Double> bm25Map_title;
-    private HashMap<String, Double> bm25Map_inlink;
+    private HashMap<Integer, Double> bm25Map_body;
+    private HashMap<Integer, Double> bm25Map_url;
+    private HashMap<Integer, Double> bm25Map_title;
+    private HashMap<Integer, Double> bm25Map_inlink;
 
-    private HashMap<String, Double> indriMap_body;
-    private HashMap<String, Double> indriMap_url;
-    private HashMap<String, Double> indriMap_title;
-    private HashMap<String, Double> indriMap_inlink;
+    private HashMap<Integer, Double> indriMap_body;
+    private HashMap<Integer, Double> indriMap_url;
+    private HashMap<Integer, Double> indriMap_title;
+    private HashMap<Integer, Double> indriMap_inlink;
+    
+    private HashMap<Integer, Double> indriMap_SDM;
 
     ArrayList<SVMFeat> featList;
 
@@ -183,6 +187,7 @@ public class LearnToRank {
         indriMap_url.clear();
         indriMap_title.clear();
         indriMap_inlink.clear();
+        indriMap_SDM.clear();
         featList.clear();
     }
 
@@ -227,7 +232,29 @@ public class LearnToRank {
             QryResult indri_inlink = QryEval.parseQuery(qryInlink, Indri)
                     .evaluate(Indri);
             buildMap(indri_inlink, indriMap_inlink);
-
+            
+            // simple SDM feat:17
+            if (featValid[16]) {
+                StringBuilder sdm = new StringBuilder();
+                String[] terms = qryBody.trim().split(" ");
+                if (terms.length <= 1) {
+                    sdm.append("#NEAR/1(");
+                    sdm.append(terms[0]);
+                    sdm.append(")");
+                } else {
+                    for (int i = 0; i < terms.length - 1; i++) {
+                        sdm.append("#NEAR/1(");
+                        sdm.append(terms[i]);
+                        sdm.append(" ");
+                        sdm.append(terms[i + 1]);
+                        sdm.append(") ");
+                    }
+                }
+                QryResult indri_sdm = QryEval.parseQuery(sdm.toString(), Indri)
+                        .evaluate(Indri);
+                buildMap(indri_sdm, indriMap_SDM);
+            }
+            
             if (!qryRelsMap.containsKey(pair[0])) {
                 System.err
                         .println("Error(LeToR): Missing relevance judgment docs!");
@@ -328,19 +355,19 @@ public class LearnToRank {
             f[3] = Double.NaN;
         }
 
-        // f5,f6,f7: score for <q, d_body>
+        // f5,f6,f7: score for <q, d_body> and f18
         Terms terms = QryEval.READER.getTermVector(docid, "body");
         if (terms != null) {
             if (!Double.isNaN(f[4])) {
-                if (bm25Map_body.containsKey(extid))
-                    f[4] = bm25Map_body.get(extid);
+                if (bm25Map_body.containsKey(docid))
+                    f[4] = bm25Map_body.get(docid);
                 else
                     f[4] = 0.0;
             }
 
             if (!Double.isNaN(f[5])) {
-                if (indriMap_body.containsKey(extid))
-                    f[5] = indriMap_body.get(extid);
+                if (indriMap_body.containsKey(docid))
+                    f[5] = indriMap_body.get(docid);
                 else
                     f[5] = 0.0;
             }
@@ -368,26 +395,30 @@ public class LearnToRank {
 
                 f[6] = ((double) match) / allValid;
             }
+            
+            
         } else {
             // System.out.println("Doc missing field: " + docid + " " + "body");
             f[4] = Double.NaN;
             f[5] = Double.NaN;
             f[6] = Double.NaN;
+            // f18: vector space model lnc.ltc
+            f[17] = Double.NaN;
         }
 
         // f8,f9,f10: score for <q, d_title>
         terms = QryEval.READER.getTermVector(docid, "title");
         if (terms != null) {
             if (!Double.isNaN(f[7])) {
-                if (bm25Map_title.containsKey(extid))
-                    f[7] = bm25Map_title.get(extid);
+                if (bm25Map_title.containsKey(docid))
+                    f[7] = bm25Map_title.get(docid);
                 else
                     f[7] = 0.0;
             }
 
             if (!Double.isNaN(f[8])) {
-                if (indriMap_title.containsKey(extid))
-                    f[8] = indriMap_title.get(extid);
+                if (indriMap_title.containsKey(docid))
+                    f[8] = indriMap_title.get(docid);
                 else
                     f[8] = 0.0;
             }
@@ -415,6 +446,38 @@ public class LearnToRank {
 
                 f[9] = ((double) match) / allValid;
             }
+            
+            // f18: vector space model lnc.ltc
+            if (!Double.isNaN(f[17])) {
+                String[] stems = new String[(int) terms.size() + 1];
+                int[] stemsFreq = new int[(int) terms.size() + 1];
+                TermsEnum ithTerm = terms.iterator(null);
+                for (int i = 1; ithTerm.next() != null; i++) {
+                    stems[i] = ithTerm.term().utf8ToString();
+                    stemsFreq[i] = (int) ithTerm.totalTermFreq();
+                }
+                double N = (double) QryEval.READER.numDocs();
+                double docVecLen = 0;
+                double qryVecLen = 0;
+                double dotProd = 0;
+                
+                for (int i = 1; i<stems.length; i++) {
+                    docVecLen += Math.pow(Math.log(stemsFreq[i]) + 1, 2);
+                    for (String token : tokens) {
+                        if (token.equals(stems[i])) {
+                            int df = QryEval.READER.docFreq(new Term("title", token));
+                            dotProd += (Math.log(stemsFreq[i]) + 1) * Math.log(N / df);
+                        }
+                    }
+                }
+                
+                for (String token : tokens) {
+                    int df = QryEval.READER.docFreq(new Term("title", token));
+                    qryVecLen += Math.pow(Math.log(N / df), 2);
+                }
+                
+                f[17] = dotProd / Math.sqrt(docVecLen * qryVecLen);
+            }
         } else {
             // System.out.println("Doc missing field: " + docid + " " +
             // "title");
@@ -427,16 +490,16 @@ public class LearnToRank {
         terms = QryEval.READER.getTermVector(docid, "url");
         if (terms != null) {
             if (!Double.isNaN(f[10])) {
-                if (bm25Map_url.containsKey(extid))
-                    f[10] = bm25Map_url.get(extid);
+                if (bm25Map_url.containsKey(docid))
+                    f[10] = bm25Map_url.get(docid);
                 else {
                     f[10] = 0.0;
                 }
             }
 
             if (!Double.isNaN(f[11])) {
-                if (indriMap_url.containsKey(extid))
-                    f[11] = indriMap_url.get(extid);
+                if (indriMap_url.containsKey(docid))
+                    f[11] = indriMap_url.get(docid);
                 else {
                     f[11] = 0.0;
                 }
@@ -476,16 +539,16 @@ public class LearnToRank {
         terms = QryEval.READER.getTermVector(docid, "inlink");
         if (terms != null) {
             if (!Double.isNaN(f[13])) {
-                if (bm25Map_inlink.containsKey(extid))
-                    f[13] = bm25Map_inlink.get(extid);
+                if (bm25Map_inlink.containsKey(docid))
+                    f[13] = bm25Map_inlink.get(docid);
                 else {
                     f[13] = 0.0;
                 }
             }
 
             if (!Double.isNaN(f[14])) {
-                if (indriMap_inlink.containsKey(extid))
-                    f[14] = indriMap_inlink.get(extid);
+                if (indriMap_inlink.containsKey(docid))
+                    f[14] = indriMap_inlink.get(docid);
                 else
                     f[14] = 0.0;
             }
@@ -522,17 +585,23 @@ public class LearnToRank {
         }
 
         // personal feat f17, f18
-        f[16] = Double.NaN;
-        f[17] = Double.NaN;
+        // f17: sequential dependency model
+        if (!Double.isNaN(f[16])) {
+            if (indriMap_SDM.containsKey(docid)) {
+                f[16] = indriMap_SDM.get(docid);
+            } else {
+                f[16] = 0.0;
+            }
+        }
     }
 
-    private void buildMap(QryResult result, HashMap<String, Double> map)
+    private void buildMap(QryResult result, HashMap<Integer, Double> map)
             throws IOException {
         for (int i = 0; i < result.docScores.scores.size(); i++) {
             int docid = result.docScores.getDocid(i);
             double score = result.docScores.getDocidScore(i);
-            String extid = QryEval.getExternalDocid(docid);
-            map.put(extid, score);
+            //String extid = QryEval.getExternalDocid(docid);
+            map.put(docid, score);
         }
     }
 
@@ -578,6 +647,28 @@ public class LearnToRank {
             QryResult indri_inlink = QryEval.parseQuery(qryInlink, Indri)
                     .evaluate(Indri);
             buildMap(indri_inlink, indriMap_inlink);
+            
+            // simple SDM feat:17
+            if (featValid[16]) {
+                StringBuilder sdm = new StringBuilder();
+                String[] terms = qryBody.trim().split(" ");
+                if (terms.length <= 1) {
+                    sdm.append("#NEAR/1(");
+                    sdm.append(terms[0]);
+                    sdm.append(")");
+                } else {
+                    for (int i = 0; i < terms.length - 1; i++) {
+                        sdm.append("#NEAR/1(");
+                        sdm.append(terms[i]);
+                        sdm.append(" ");
+                        sdm.append(terms[i + 1]);
+                        sdm.append(") ");
+                    }
+                }
+                QryResult indri_sdm = QryEval.parseQuery(sdm.toString(), Indri)
+                        .evaluate(Indri);
+                buildMap(indri_sdm, indriMap_SDM);
+            }
 
             // generate initial BM25 ranking
             ArrayList<String> initRankList = getInitialRanking(qryBody);
@@ -902,3 +993,9 @@ public class LearnToRank {
         }
     }
 }
+
+
+
+
+
+
